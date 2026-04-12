@@ -292,12 +292,14 @@ def lxmf_delivery(lxm):
         RNS.log("Error occurred while processing received message "+str(lxm)+". The contained exception was: "+str(e), RNS.LOG_ERROR)
 
 
-def program_setup(configdir = None, rnsconfigdir = None, run_pn = False, on_inbound = None, verbosity = 0, quietness = 0, service = False):
+def program_setup(configdir = None, logfile = None, rnsconfigdir = None,
+                  run_pn = False, on_inbound = None, verbosity = 0,
+                  quietness = 0, service = False):
     global configpath, ignoredpath, identitypath, allowedpath, storagedir, lxmdir
     global lxmd_config, active_configuration, targetloglevel
     global message_router, lxmf_destination
 
-    if service:
+    if service or logfile:
         targetlogdest  = RNS.LOG_FILE
         targetloglevel = None
     else:
@@ -311,6 +313,15 @@ def program_setup(configdir = None, rnsconfigdir = None, run_pn = False, on_inbo
             configdir = RNS.Reticulum.userdir+"/.config/lxmd"
         else:
             configdir = RNS.Reticulum.userdir+"/.lxmd"
+
+    # Hack. This gets reset by the Reticulum init but we want to make sure all
+    # logging ends up in the right spot, especially when lxmd is run as a
+    # system service.
+    if logfile:
+        RNS.logdest = RNS.LOG_FILE
+        RNS.logfile = logfile
+    else:
+        logfile = configdir+"/logfile"
 
     configpath   = configdir+"/config"
     ignoredpath  = configdir+"/ignored"
@@ -347,8 +358,10 @@ def program_setup(configdir = None, rnsconfigdir = None, run_pn = False, on_inbo
     
     # Start Reticulum
     RNS.log("Substantiating Reticulum...")
-    reticulum = RNS.Reticulum(configdir=rnsconfigdir, loglevel=targetloglevel, logdest=targetlogdest)
-    if targetlogdest == RNS.LOG_FILE: RNS.logfile = configdir+"/logfile"
+    reticulum = RNS.Reticulum(configdir=rnsconfigdir,
+                              loglevel=targetloglevel,
+                              logdest=targetlogdest,
+                              logfile=logfile)
 
     # Generate or load primary identity
     if os.path.isfile(identitypath):
@@ -860,6 +873,7 @@ def main():
     try:
         parser = argparse.ArgumentParser(description="Lightweight Extensible Messaging Daemon")
         parser.add_argument("--config", action="store", default=None, help="path to alternative lxmd config directory", type=str)
+        parser.add_argument("--logfile", action="store", default=None, help="path to alternative lxmd logfile", type=str)
         parser.add_argument("--rnsconfig", action="store", default=None, help="path to alternative Reticulum config directory", type=str)
         parser.add_argument("-p", "--propagation-node", action="store_true", default=False, help="run an LXMF Propagation Node")
         parser.add_argument("-i", "--on-inbound", action="store", metavar="PATH", default=None, help="executable to run when a message is received", type=str)
@@ -919,7 +933,8 @@ def main():
                            remote=args.remote)
             exit()
 
-        program_setup(configdir = args.config,
+        program_setup(configdir=args.config,
+                      logfile=args.logfile,
                       rnsconfigdir=args.rnsconfig,
                       run_pn=args.propagation_node,
                       on_inbound=args.on_inbound,
