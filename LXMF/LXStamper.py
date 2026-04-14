@@ -298,7 +298,13 @@ def job_linux(stamp_cost, workblock, message_id):
     stamp = None
     total_rounds = 0
     cores = multiprocessing.cpu_count()
-    jobs = cores if cores <= 12 else int(cores/2)
+    if cores < 3:
+        jobs = 1
+    elif cores <= 12:
+        jobs = cores-1
+    else:
+        jobs = int(cores/2)
+
     stop_event   = multiprocessing.Event()
     result_queue = multiprocessing.Queue(1)
     rounds_queue = multiprocessing.Queue()
